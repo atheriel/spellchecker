@@ -4,8 +4,9 @@ extern crate libc;
 extern crate encoding;
 
 use std::ffi::{CStr, CString};
+use std::ptr;
 
-use encoding::types::{EncodingRef, EncoderTrap};
+use encoding::types::{EncodingRef, DecoderTrap, EncoderTrap};
 use encoding::label::encoding_from_whatwg_label;
 
 mod ffi;
@@ -45,9 +46,43 @@ impl Hunspell {
         }
     }
 
-    #[allow(unused_variables)]
     pub fn suggestions_for(&self, word: &str) -> Vec<String> {
-        unimplemented!()
+        let word = self.encoding.encode(word, EncoderTrap::Strict).unwrap();
+        let cword = CString::new(word).unwrap();
+
+        // Create an empty array of C strings for Hunspell to fill.
+        let mut suggestions: *mut *mut libc::c_char = ptr::null_mut();
+
+        let length = unsafe {
+            ffi::Hunspell_suggest(self.handle, &mut suggestions, cword.as_ptr())
+        };
+        if length <= 0 || suggestions.is_null() {
+            return Vec::new()
+        }
+        let length = length as usize;
+        let mut results = Vec::with_capacity(length);
+
+        for i in 0..length {
+            let suggestion = unsafe {
+                let sug_ptr: *const libc::c_char = *suggestions.offset(i as isize);
+                if sug_ptr.is_null() {
+                    panic!("null pointer in suggestions lists");
+                }
+                CStr::from_ptr(sug_ptr)
+            };
+
+            let decoded = self.encoding.decode(suggestion.to_bytes(), DecoderTrap::Strict).unwrap();
+
+            results.push(decoded);
+        }
+
+        // Deallocate the suggestion list provided by Hunspell. Otherwise, we
+        // will leak memory.
+        unsafe {
+            ffi::Hunspell_free_list(self.handle, &mut suggestions, length as libc::c_int)
+        };
+
+        results
     }
 
     #[allow(unused_variables)]
@@ -82,6 +117,29 @@ fn test_spelling() {
 
     assert_eq!(spellchecker.spelling("dog"), true);
     assert_eq!(spellchecker.spelling("dogw"), false);
+}
+
+#[test]
+fn test_suggestions() {
+    let spellchecker = Hunspell::create("dict/en_CA.aff", "dict/en_CA.dic");
+    let slist = vec![
+        "dog",
+        "doe",
+        "doges",
+        "dogie",
+        "dodge",
+        "dogs",
+        "dose",
+        "done",
+        "dote",
+        "dole",
+        "loge",
+        "dome",
+        "dope",
+        "dogy",
+        "dove"];
+
+    assert_eq!(spellchecker.suggestions_for("doge"), slist);
 }
 
 #[test]
