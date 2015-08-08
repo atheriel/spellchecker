@@ -5,5 +5,8 @@ authors = ["Aaron Jacobs <atheriel@gmail.com>"]
 links = "hunspell-1.3.0"
 build = "build.rs"
 
+[dependencies]
+encoding = "0.2"
+
 [build-dependencies]
 pkg-config = "*"
