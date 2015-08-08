@@ -1,0 +1,4 @@
+[package]
+name = "spellcheck"
+version = "0.1.0"
+authors = ["Aaron Jacobs <atheriel@gmail.com>"]
