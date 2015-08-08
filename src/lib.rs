@@ -1,8 +1,8 @@
-#![feature(libc)]
+#![feature(libc, cstr_to_str)]
 
 extern crate libc;
 
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 
 mod ffi;
 
@@ -22,6 +22,16 @@ impl Hunspell {
         };
 
         Hunspell { handle: handle }
+    }
+
+    pub fn encoding(&self) -> String {
+        let enc_ptr = unsafe {ffi::Hunspell_get_dic_encoding(self.handle) };
+        if enc_ptr.is_null() {
+            panic!("null pointer returned from get_dic_encoding")
+        }
+        unsafe {
+            CStr::from_ptr(enc_ptr).to_string_lossy().into_owned()
+        }
     }
 
     pub fn spelling(&self, word: &str) -> bool {
@@ -76,4 +86,11 @@ fn test_whitespace() {
 
     assert_eq!(spellchecker.spelling(" "), true);
     assert_eq!(spellchecker.spelling(""), true);
+}
+
+#[test]
+fn test_encoding() {
+    let spellchecker = Hunspell::create("dict/en_CA.aff", "dict/en_CA.dic");
+
+    assert_eq!(spellchecker.encoding(), "UTF-8");
 }
