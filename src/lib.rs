@@ -1,9 +1,11 @@
-#![feature(libc, cstr_to_str)]
+#![feature(libc, convert, cstr_to_str, path_ext)]
 
 extern crate libc;
 extern crate encoding;
 
 use std::ffi::{CStr, CString};
+use std::fs::PathExt;
+use std::path::Path;
 use std::ptr;
 
 use encoding::types::{EncodingRef, DecoderTrap, EncoderTrap};
@@ -17,14 +19,18 @@ pub struct Hunspell {
 }
 
 impl Hunspell {
-    pub fn create(affpath: &str, dpath: &str) -> Hunspell {
-        // TODO: Check both paths.
+    pub fn create<T: AsRef<Path>>(affpath: T, dpath: T) -> Hunspell {
+        if !affpath.as_ref().exists() || !dpath.as_ref().exists() {
+            panic!("nonexistent dictionary or affix path");
+        }
 
-        let affpath = CString::new(affpath).unwrap();
-        let dpath = CString::new(dpath).unwrap();
+        // These paths should never contain interior \0 bytes (if they were
+        // created through Rust), so it is safe to unwrap() them here.
+        let affcpath = affpath.as_ref().as_os_str().to_cstring().unwrap();
+        let dcpath = dpath.as_ref().as_os_str().to_cstring().unwrap();
 
         let handle = unsafe {
-            ffi::Hunspell_create(affpath.as_ptr(), dpath.as_ptr())
+            ffi::Hunspell_create(affcpath.as_ptr(), dcpath.as_ptr())
         };
 
         let enc = get_hunspell_encoding(handle).unwrap();
