@@ -91,14 +91,20 @@ impl Hunspell {
         results
     }
 
-    #[allow(unused_variables)]
     pub fn add_word(&mut self, word: &str) {
-        unimplemented!()
+        let word = self.encoding.encode(word, EncoderTrap::Strict).unwrap();
+        let cword = CString::new(word).unwrap();
+
+        let rval = unsafe { ffi::Hunspell_add(self.handle, cword.as_ptr()) };
+        assert!(rval == 0);
     }
 
-    #[allow(unused_variables)]
     pub fn remove_word(&mut self, word: &str) {
-        unimplemented!()
+        let word = self.encoding.encode(word, EncoderTrap::Strict).unwrap();
+        let cword = CString::new(word).unwrap();
+
+        let rval = unsafe { ffi::Hunspell_remove(self.handle, cword.as_ptr()) };
+        assert!(rval == 0);
     }
 }
 
@@ -168,4 +174,15 @@ fn test_encoding() {
     let spellchecker = Hunspell::create("dict/en_CA.aff", "dict/en_CA.dic");
 
     assert_eq!(spellchecker.encoding(), "utf-8");
+}
+
+#[test]
+fn test_adding_and_removing_words() {
+    let mut spellchecker = Hunspell::create("dict/en_CA.aff", "dict/en_CA.dic");
+
+    assert_eq!(spellchecker.spelling("dogw"), false);
+    spellchecker.add_word("dogw");
+    assert_eq!(spellchecker.spelling("dog"), true);
+    spellchecker.remove_word("dogw");
+    assert_eq!(spellchecker.spelling("dogw"), false);
 }
